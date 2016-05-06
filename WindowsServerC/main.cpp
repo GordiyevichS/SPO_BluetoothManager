@@ -5,6 +5,7 @@
 #include <strsafe.h>
 #include <stdint.h>
 #include <Windows.h>
+#include <WinUser.h>
 
 #pragma comment(lib, "Ws2_32.lib")
 
@@ -102,6 +103,13 @@ DWORD sendVirtualKey(UINT vk, BOOL up) {
     return scan ? sendScanCode(scan, up) : ERROR_NO_UNICODE_TRANSLATION;
 }
 
+void openMyComputer() {
+
+	HANDLE Handle;
+
+	ShellExecute(NULL, NULL, "::{20D04FE0-3AEA-1069-A2D8-08002B30309D}", NULL,NULL,SW_SHOWNORMAL);
+}
+
 BOOL run_server_mode()
 {
 	LPSTR instance_name = NULL;
@@ -109,6 +117,7 @@ BOOL run_server_mode()
 	SOCKADDR_BTH sock_addr_bth_local = { 0 };
 	LPCSADDR_INFO addr_info = NULL;
 	BOOL ret = FALSE;
+	POINT point;
 
 	local_socket = socket(AF_BTH, SOCK_STREAM, BTHPROTO_RFCOMM);
 	if (local_socket == INVALID_SOCKET) {
@@ -167,8 +176,12 @@ BOOL run_server_mode()
 				return FALSE;
 			}
 
-			if(!strcmp(buffer,"ADMIN")){			
+			if(!strcmp(buffer,"openNoGba")){			
 				WinExec("E:\\NO$GBA.2.6a\\NO$Zoomer.exe",1);
+			}
+
+			else if(!strcmp(buffer,"openMyComp")) {
+				openMyComputer();
 			}
 
 			else if(!strcmp(buffer,"up")) {
@@ -229,6 +242,74 @@ BOOL run_server_mode()
 				sendVirtualKey(0x44,FALSE);
 				Sleep(100);
 				sendVirtualKey(0x44,TRUE);
+			}
+
+			else if(!strcmp(buffer,"mouseUp")) {
+				GetCursorPos(&point);
+				SetCursorPos(point.x,point.y+3);
+				Sleep(10);
+			}
+
+			else if(!strcmp(buffer,"mouseDown")) {
+				GetCursorPos(&point);
+				SetCursorPos(point.x,point.y-3);
+				Sleep(10);
+			}
+
+			else if(!strcmp(buffer,"mouseLeft")) {
+				GetCursorPos(&point);
+				SetCursorPos(point.x-3,point.y);
+				Sleep(10);
+			}
+
+			else if(!strcmp(buffer,"mouseRight")) {
+				GetCursorPos(&point);
+				SetCursorPos(point.x+3,point.y);
+				Sleep(10);
+			}
+
+			else if(!strcmp(buffer,"mouseUpRight")) {
+				GetCursorPos(&point);
+				SetCursorPos(point.x+3,point.y+3);
+				Sleep(10);
+			}
+
+			else if(!strcmp(buffer,"mouseUpLeft")) {
+				GetCursorPos(&point);
+				SetCursorPos(point.x+3,point.y-3);
+				Sleep(10);
+			}
+
+			else if(!strcmp(buffer,"mouseDownRight")) {
+				GetCursorPos(&point);
+				SetCursorPos(point.x-3,point.y+3);
+				Sleep(10);
+			}
+
+			else if(!strcmp(buffer,"mouseDownLeft")) {
+				GetCursorPos(&point);
+				SetCursorPos(point.x-3,point.y-3);
+				Sleep(10);
+			}
+
+			else if (!strcmp(buffer,"mouseRightClick")) {
+				GetCursorPos(&point);
+				mouse_event(MOUSEEVENTF_RIGHTDOWN,point.x, point.y, 0, 0);
+				mouse_event(MOUSEEVENTF_RIGHTUP, point.x, point.y, 0, 0);
+			}
+
+			else if (!strcmp(buffer,"mouseLeftClick")) {
+				GetCursorPos(&point);
+				mouse_event(MOUSEEVENTF_LEFTDOWN,point.x, point.y, 0, 0);
+				mouse_event(MOUSEEVENTF_LEFTUP, point.x, point.y, 0, 0);
+			}
+
+			else if (!strcmp(buffer,"mouseWheelUp")) {
+				mouse_event(MOUSEEVENTF_WHEEL,0,0,120,0);
+			}
+
+			else if (!strcmp(buffer,"mouseWheelDown")) {
+				mouse_event(MOUSEEVENTF_WHEEL,0,0,(DWORD)-120,0);
 			}
 
 			else if(!strcmp(buffer,"end")) {

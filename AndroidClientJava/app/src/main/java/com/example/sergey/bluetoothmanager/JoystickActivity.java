@@ -10,6 +10,7 @@ import android.os.Bundle;
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Button;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.IOException;
@@ -24,6 +25,8 @@ public class JoystickActivity extends AppCompatActivity implements View.OnLongCl
     public BluetoothSocket bluetoothSocket = null;
     public OutputStream outStream = null;
     public boolean action;
+
+    public MenuActivity ma;
 
     public Button buttonUp,buttonDown,buttonLeft,buttonRight,buttonA,buttonB,buttonX,buttonY,
     buttonStart,buttonSelect;
@@ -61,53 +64,11 @@ public class JoystickActivity extends AppCompatActivity implements View.OnLongCl
         super.onStart();
 
         Toast toast;
-        Intent intent = getIntent();
-
-        String adress = intent.getStringExtra("key");
-
-        BluetoothDevice device = bluetoothAdapter.getRemoteDevice(adress);
-        try {
-            bluetoothSocket = device.createRfcommSocketToServiceRecord(MY_UUID);
-        } catch ( IOException e) {
-            toast = Toast.makeText(getApplicationContext(),"UUID error",Toast.LENGTH_SHORT);
-            toast.show();
-        }
 
         try {
-            bluetoothSocket.connect();
-        } catch (IOException e) {
-            try {
-                toast = Toast.makeText(getApplicationContext(),"Connect error",Toast.LENGTH_SHORT);
-                toast.show();
-                bluetoothSocket.close();
-            } catch (IOException e2) {
-                toast = Toast.makeText(getApplicationContext(),"Closing socket error",Toast.LENGTH_SHORT);
-                toast.show();
-            }
-        }
-
-        try {
-            outStream = bluetoothSocket.getOutputStream();
+            outStream = ma.bluetoothSocket.getOutputStream();
         } catch (IOException e) {
             toast = Toast.makeText(getApplicationContext(),"GetStream error",Toast.LENGTH_SHORT);
-            toast.show();
-        }
-    }
-
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-
-        Toast toast;
-        String out = "end";
-        byte[] msgBuffer = out.getBytes();
-
-        writeInStream(msgBuffer);
-
-        try {
-            bluetoothSocket.close();
-        } catch (IOException e) {
-            toast = Toast.makeText(getApplicationContext(),"Closing socket error",Toast.LENGTH_SHORT);
             toast.show();
         }
     }
