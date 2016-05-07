@@ -1,107 +1,9 @@
-#include <WinSock2.h>
-#include <stdio.h>
-#include <initguid.h>
-#include <ws2bth.h>
-#include <strsafe.h>
-#include <stdint.h>
-#include <Windows.h>
-#include <WinUser.h>
+#include "Connect.h"
+#include "Keyboard.h"
+#include "Mouse.h"
+#include <conio.h>
 
 #pragma comment(lib, "Ws2_32.lib")
-
-//00001101-0000-1000-8000-00805f9b34fb
-DEFINE_GUID(g_guidServiceClass, 0x00001101, 0x0000, 0x1000, 0x80, 0x00, 0x00, 0x80, 0x5f, 0x9b, 0x34, 0xfb);
-
-#define INSTANCE_STR L"BluetoothWindows"
-
-#define bufferLength 256
-
-void print_error(char const *where, int code)
-{
-	fprintf(stderr, "Error on %s: code %d\n", where, code);
-}
-
-BOOL bind_socket(SOCKET local_socket, SOCKADDR_BTH *sock_addr_bth_local)
-{
-	int addr_len = sizeof(SOCKADDR_BTH);
-
-	sock_addr_bth_local->addressFamily = AF_BTH;
-	sock_addr_bth_local->port = BT_PORT_ANY;
-
-	if (bind(local_socket, (struct sockaddr *) sock_addr_bth_local, sizeof(SOCKADDR_BTH)) == SOCKET_ERROR) {
-		print_error("bind()", WSAGetLastError());
-		return FALSE;
-	}
-
-	if (getsockname(local_socket, (struct sockaddr *)sock_addr_bth_local, &addr_len) == SOCKET_ERROR) {
-		print_error("getsockname()", WSAGetLastError());
-		return FALSE;
-	}
-	return TRUE;
-}
-
-LPCSADDR_INFO create_addr_info(SOCKADDR_BTH *sock_addr_bth_local)
-{
-	LPCSADDR_INFO addr_info = (LPCSADDR_INFO)calloc(1, sizeof(CSADDR_INFO));
-
-	if (addr_info == NULL) {
-		print_error("malloc(addr_info)", WSAGetLastError());
-		return NULL;
-	}
-
-	addr_info[0].LocalAddr.iSockaddrLength = sizeof(SOCKADDR_BTH);
-	addr_info[0].LocalAddr.lpSockaddr = (LPSOCKADDR)sock_addr_bth_local;
-	addr_info[0].RemoteAddr.iSockaddrLength = sizeof(SOCKADDR_BTH);
-	addr_info[0].RemoteAddr.lpSockaddr = (LPSOCKADDR)&sock_addr_bth_local;
-	addr_info[0].iSocketType = SOCK_STREAM;
-	addr_info[0].iProtocol = BTHPROTO_RFCOMM;
-	return addr_info;
-}
-
-BOOL advertise_service_accepted(LPCSADDR_INFO addr_info, LPSTR *instance_name)
-{
-	WSAQUERYSET wsa_query_set = { 0 };
-	size_t instance_name_size = 0;
-	HRESULT res;
-
-	instance_name_size += sizeof(INSTANCE_STR) + 1;
-	*instance_name = (LPSTR) malloc(instance_name_size);
-	if (*instance_name == NULL) {
-		print_error("malloc(instance_name)", WSAGetLastError());
-		return FALSE;
-	}
-
-	ZeroMemory(&wsa_query_set, sizeof(wsa_query_set));
-    wsa_query_set.dwSize = sizeof(wsa_query_set);
-    wsa_query_set.lpServiceClassId = (LPGUID)&g_guidServiceClass;
-
-	wsa_query_set.lpszServiceInstanceName = "MyService";
-    wsa_query_set.dwNameSpace = NS_BTH;
-    wsa_query_set.dwNumberOfCsAddrs = 1;
-    wsa_query_set.lpcsaBuffer = addr_info;
-
-
-	if (WSASetService(&wsa_query_set, RNRSERVICE_REGISTER, 0) == SOCKET_ERROR) {
-		//free(instance_name);
-		print_error("WSASetService()", WSAGetLastError());
-		return FALSE;
-	}
-	return TRUE;
-}
-
-DWORD sendScanCode(WORD scan, BOOL up) {
-    INPUT inp = {0};
-    inp.type = INPUT_KEYBOARD;
-    inp.ki.wScan = scan;
-    inp.ki.dwFlags = KEYEVENTF_SCANCODE | (up ? KEYEVENTF_KEYUP : 0); 
-    return SendInput(1, &inp, sizeof(inp)) ? NO_ERROR : GetLastError();
-}
-
-DWORD sendVirtualKey(UINT vk, BOOL up) {
-    UINT scan = MapVirtualKey(vk, MAPVK_VK_TO_VSC);
-
-    return scan ? sendScanCode(scan, up) : ERROR_NO_UNICODE_TRANSLATION;
-}
 
 void openMyComputer() {
 
@@ -110,14 +12,31 @@ void openMyComputer() {
 	ShellExecute(NULL, NULL, "::{20D04FE0-3AEA-1069-A2D8-08002B30309D}", NULL,NULL,SW_SHOWNORMAL);
 }
 
-BOOL run_server_mode()
-{
+BOOL readBuffer(char* &buffer,SOCKET client_socket) {
+
+	int len_read;
+
+	buffer =(char*) calloc(bufferLength, sizeof(char*));
+	if (buffer == NULL) {
+		print_error("malloc(buffer)", WSAGetLastError());
+		return FALSE;
+	}
+
+	len_read = recv(client_socket, buffer, bufferLength, 0);
+	if (len_read == SOCKET_ERROR) {
+		free(buffer);
+		print_error("recv()", WSAGetLastError());
+		return FALSE;
+	}
+}
+
+BOOL run_server_mode() {
 	LPSTR instance_name = NULL;
 	SOCKET local_socket = INVALID_SOCKET;
 	SOCKADDR_BTH sock_addr_bth_local = { 0 };
 	LPCSADDR_INFO addr_info = NULL;
 	BOOL ret = FALSE;
-	POINT point;
+	char end;
 
 	local_socket = socket(AF_BTH, SOCK_STREAM, BTHPROTO_RFCOMM);
 	if (local_socket == INVALID_SOCKET) {
@@ -129,10 +48,12 @@ BOOL run_server_mode()
 	if (!ret) {
 		return FALSE;
 	}
+
 	addr_info = create_addr_info(&sock_addr_bth_local);
 	if (!addr_info) {
 		return FALSE;
 	}
+
 	ret = advertise_service_accepted(addr_info, &instance_name);
 	if (!ret) {
 		free(addr_info);
@@ -159,157 +80,66 @@ BOOL run_server_mode()
 		printf("Client connected !\n");
 
 		char *buffer = NULL;
-		int len_read = 0;
 
 		while(1) {
 
-			buffer =(char*) calloc(bufferLength, sizeof(char*));
-			if (buffer == NULL) {
-				print_error("malloc(buffer)", WSAGetLastError());
-				return FALSE;
-			}
-
-			len_read = recv(client_socket, buffer, bufferLength, 0);
-			if (len_read == SOCKET_ERROR) {
-				free(buffer);
-				print_error("recv()", WSAGetLastError());
+			if(!readBuffer(buffer,client_socket)) {
 				return FALSE;
 			}
 
 			if(!strcmp(buffer,"openNoGba")){			
-				WinExec("E:\\NO$GBA.2.6a\\NO$Zoomer.exe",1);
+				WinExec("E:\\NO$GBA.2.6a\\NO$GBA.exe",1);
+				free(buffer);
 			}
 
 			else if(!strcmp(buffer,"openMyComp")) {
 				openMyComputer();
+				free(buffer);
 			}
 
-			else if(!strcmp(buffer,"up")) {
-				sendVirtualKey(VK_UP,FALSE);
-				Sleep(100);
-				sendVirtualKey(VK_UP,TRUE);
-			}
-			
-			else if(!strcmp(buffer,"down")) {
-				sendVirtualKey(VK_DOWN,FALSE);
-				Sleep(100);
-				sendVirtualKey(VK_DOWN,TRUE);
+			else if(!strcmp(buffer,"joystick")) {
+				free(buffer);
+				printf("Start joystick mode\n");
+				while(1) {
+					if(!readBuffer(buffer,client_socket)) {
+						return FALSE;
+					}
+
+					joystickCMP(buffer); 
+
+					if(!strcmp(buffer,"endJoystick")){
+						free(buffer);
+						break;
+					}
+
+
+					free(buffer);
+				}
+				printf("End joystick mode\n");
+				continue;
 			}
 
-			else if(!strcmp(buffer,"left")) {
-				sendVirtualKey(VK_LEFT,FALSE);
-				Sleep(100);
-				sendVirtualKey(VK_LEFT,TRUE);
-			}
+			else if(!strcmp(buffer,"openPlayer")) {
+				free(buffer);
+				WinExec("C:\\Program Files (x86)\\AIMP3\\AIMP3.exe",1);
+				printf("Start player mode\n");
+				while(1) {
+					if(!readBuffer(buffer,client_socket)) {
+						return FALSE;
+					}
 
-			else if(!strcmp(buffer,"right")) {
-				sendVirtualKey(VK_RIGHT,FALSE);
-				Sleep(100);
-				sendVirtualKey(VK_RIGHT,TRUE);
-			}
-			
-			else if(!strcmp(buffer,"A")) {
-				sendVirtualKey(0x5A,FALSE);
-				Sleep(100);
-				sendVirtualKey(0x5A,TRUE);
-			}
+					playerCMP(buffer); 
 
-			else if(!strcmp(buffer,"B")) {
-				sendVirtualKey(0x58,FALSE);
-				Sleep(100);
-				sendVirtualKey(0x58,TRUE);
-			}
+					if(!strcmp(buffer,"endPlayer")){
+						free(buffer);
+						break;
+					}
 
-			else if(!strcmp(buffer,"Y")) {
-				sendVirtualKey(0x53,FALSE);
-				Sleep(100);
-				sendVirtualKey(0x53,TRUE);
-			}
 
-			else if(!strcmp(buffer,"X")) {
-				sendVirtualKey(VK_RETURN,FALSE);
-				Sleep(100);
-				sendVirtualKey(VK_RETURN,TRUE);
-			}
-
-			else if(!strcmp(buffer,"start")) {
-				sendVirtualKey(0x41,FALSE);
-				Sleep(100);
-				sendVirtualKey(0x41,TRUE);
-			}
-
-			else if(!strcmp(buffer,"select")) {
-				sendVirtualKey(0x44,FALSE);
-				Sleep(100);
-				sendVirtualKey(0x44,TRUE);
-			}
-
-			else if(!strcmp(buffer,"mouseUp")) {
-				GetCursorPos(&point);
-				SetCursorPos(point.x,point.y+3);
-				Sleep(10);
-			}
-
-			else if(!strcmp(buffer,"mouseDown")) {
-				GetCursorPos(&point);
-				SetCursorPos(point.x,point.y-3);
-				Sleep(10);
-			}
-
-			else if(!strcmp(buffer,"mouseLeft")) {
-				GetCursorPos(&point);
-				SetCursorPos(point.x-3,point.y);
-				Sleep(10);
-			}
-
-			else if(!strcmp(buffer,"mouseRight")) {
-				GetCursorPos(&point);
-				SetCursorPos(point.x+3,point.y);
-				Sleep(10);
-			}
-
-			else if(!strcmp(buffer,"mouseUpRight")) {
-				GetCursorPos(&point);
-				SetCursorPos(point.x+3,point.y+3);
-				Sleep(10);
-			}
-
-			else if(!strcmp(buffer,"mouseUpLeft")) {
-				GetCursorPos(&point);
-				SetCursorPos(point.x+3,point.y-3);
-				Sleep(10);
-			}
-
-			else if(!strcmp(buffer,"mouseDownRight")) {
-				GetCursorPos(&point);
-				SetCursorPos(point.x-3,point.y+3);
-				Sleep(10);
-			}
-
-			else if(!strcmp(buffer,"mouseDownLeft")) {
-				GetCursorPos(&point);
-				SetCursorPos(point.x-3,point.y-3);
-				Sleep(10);
-			}
-
-			else if (!strcmp(buffer,"mouseRightClick")) {
-				GetCursorPos(&point);
-				mouse_event(MOUSEEVENTF_RIGHTDOWN,point.x, point.y, 0, 0);
-				mouse_event(MOUSEEVENTF_RIGHTUP, point.x, point.y, 0, 0);
-			}
-
-			else if (!strcmp(buffer,"mouseLeftClick")) {
-				GetCursorPos(&point);
-				mouse_event(MOUSEEVENTF_LEFTDOWN,point.x, point.y, 0, 0);
-				mouse_event(MOUSEEVENTF_LEFTUP, point.x, point.y, 0, 0);
-			}
-
-			else if (!strcmp(buffer,"mouseWheelUp")) {
-				mouse_event(MOUSEEVENTF_WHEEL,0,0,120,0);
-			}
-
-			else if (!strcmp(buffer,"mouseWheelDown")) {
-				mouse_event(MOUSEEVENTF_WHEEL,0,0,(DWORD)-120,0);
+					free(buffer);
+				}
+				printf("End player mode\n");
+				continue;
 			}
 
 			else if(!strcmp(buffer,"end")) {
@@ -317,17 +147,17 @@ BOOL run_server_mode()
 				break;
 			}
 
-			else if (len_read == 0) {
-				free(buffer);
-				fprintf(stderr, "Nothing read, end of communication\n");
-				break;
-			}
-
-			free(buffer);
+			else
+				mouseCMP(buffer);
 		}
 
 		printf("Communication over\n");
 		closesocket(client_socket);
+
+		printf("Continue?(press 'n' to exit)");
+		if(end = getch() == 'n') {
+			break;
+		}
 	}
 
 	free(addr_info);
@@ -336,8 +166,7 @@ BOOL run_server_mode()
 	return TRUE;
 }
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
 	WSADATA WSAData = { 0 };
 	int ret = 0;
 

@@ -19,14 +19,10 @@ import java.util.UUID;
 
 public class JoystickActivity extends AppCompatActivity implements View.OnLongClickListener, View.OnTouchListener {
 
-    private static final UUID MY_UUID = UUID.fromString("00001101-0000-1000-8000-00805f9b34fb");
-
-    public BluetoothAdapter bluetoothAdapter;
-    public BluetoothSocket bluetoothSocket = null;
     public OutputStream outStream = null;
     public boolean action;
 
-    public MenuActivity ma;
+    public MenuActivity menuActivity;
 
     public Button buttonUp,buttonDown,buttonLeft,buttonRight,buttonA,buttonB,buttonX,buttonY,
     buttonStart,buttonSelect;
@@ -39,8 +35,6 @@ public class JoystickActivity extends AppCompatActivity implements View.OnLongCl
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_joystick);
-
-        bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
 
         buttonUp = (Button) findViewById(R.id.buttonUp);
         buttonDown = (Button) findViewById(R.id.buttonDown);
@@ -66,11 +60,23 @@ public class JoystickActivity extends AppCompatActivity implements View.OnLongCl
         Toast toast;
 
         try {
-            outStream = ma.bluetoothSocket.getOutputStream();
+            outStream = menuActivity.bluetoothSocket.getOutputStream();
         } catch (IOException e) {
             toast = Toast.makeText(getApplicationContext(),"GetStream error",Toast.LENGTH_SHORT);
             toast.show();
         }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+
+        String out = "endJoystick";
+        byte[] msgBuffer = out.getBytes();
+
+        if(menuActivity.k == 1)
+            writeInStream(msgBuffer);
+        menuActivity.k++;
     }
 
     public boolean onLongClick(View view) {

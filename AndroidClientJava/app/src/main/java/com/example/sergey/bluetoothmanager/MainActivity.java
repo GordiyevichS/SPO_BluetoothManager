@@ -27,15 +27,9 @@ public class MainActivity extends AppCompatActivity {
     public Button buttonSearch;
     public ListView listDevicesFound;
 
-    private static final UUID MY_UUID = UUID.fromString("00001101-0000-1000-8000-00805f9b34fb");
-
-    private List<String> discoveredDevices = new ArrayList<String>();
     public ArrayAdapter<String> btArrayAdapter;
 
     public BluetoothAdapter bluetoothAdapter;
-    public BluetoothSocket bluetoothSocket = null;
-    public OutputStream outStream = null;
-    private BroadcastReceiver discoverDevicesReceiver,discoveryFinishedReceiver;
 
     public View.OnClickListener listenerEnableBT,listenerDisableBT,listenerSearchDevices;
 

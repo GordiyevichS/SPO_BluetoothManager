@@ -23,6 +23,7 @@ public class MenuActivity extends AppCompatActivity implements  View.OnTouchList
     public BluetoothAdapter bluetoothAdapter;
     public static BluetoothSocket bluetoothSocket = null;
     public OutputStream outStream = null;
+    public static int k;
 
     public Button buttonMyComp,buttonNoGba,buttonJoystick,buttonAimp,buttonLeftClick,buttonRightClick,
             buttonWheelUp,buttonWheelDown;
@@ -33,15 +34,13 @@ public class MenuActivity extends AppCompatActivity implements  View.OnTouchList
     public TextView viewTouchpad;
     public Toast toast;
 
-    public MainActivity ma;
-
     public String out = "first";
     public float cordX = 0,cordY = 0,cordXCur,cordYCur;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_test);
+        setContentView(R.layout.activity_menu);
 
         bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
 
@@ -140,6 +139,11 @@ public class MenuActivity extends AppCompatActivity implements  View.OnTouchList
         listenerJoystick = new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                out = "joystick";
+                byte[] msgBuffer = out.getBytes();
+                writeInStream(msgBuffer);
+
+                k=0;
                 Intent intent = new Intent(getBaseContext(),JoystickActivity.class);
                 startActivity(intent);
             }
@@ -161,7 +165,12 @@ public class MenuActivity extends AppCompatActivity implements  View.OnTouchList
         listenerAimp = new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                out = "openPlayer";
+                byte[] msgBuffer = out.getBytes();
+                writeInStream(msgBuffer);
 
+                Intent intent = new Intent(getBaseContext(),PlayerActivity.class);
+                startActivity(intent);
             }
         };
 
